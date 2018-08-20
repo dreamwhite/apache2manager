@@ -1,0 +1,13 @@
+<VirtualHost *:80>
+    ServerName template.url
+    DocumentRoot template.docroot
+    <Directory template.docroot/>
+        Options -Indexes +FollowSymLinks +MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+    <FilesMatch \.php$>
+        # Apache 2.4.10+ can proxy to unix socket
+        SetHandler "proxy:unix:/var/run/php/phpversion.sock|fcgi://localhost/"
+    </FilesMatch>
+</VirtualHost>
