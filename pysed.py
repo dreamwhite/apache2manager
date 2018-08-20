@@ -6,6 +6,7 @@ __license__ = "The MIT License (MIT)"
 import re
 
 def replace(oldstr, newstr, infile, dryrun=False):
+    
     '''
     Sed-like Replace function..
     Usage: pysed.replace(<Old string>, <Replacement String>, <Text File>)
