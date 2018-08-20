@@ -39,7 +39,6 @@ class Apache2Manager():
 
     def commands(self):
 
-
         commands = [
 
             "add",
@@ -60,7 +59,6 @@ class Apache2Manager():
         ] #Commands
 
         return commands
-
 
     def php_versions(self): #Get all PHP versions installed
 
