@@ -27,6 +27,7 @@ def replace(oldstr, newstr, infile, dryrun=False):
         exit("Unknown option specified to 'dryrun' argument, Usage: dryrun=<True|False>.")
 
 def rmlinematch(oldstr, infile, dryrun=False):
+    
     '''
     Sed-like line deletion function based on given string..
     Usage: pysed.rmlinematch(<Unwanted string>, <Text File>)
