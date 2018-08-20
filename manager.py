@@ -305,7 +305,6 @@ class Site(Apache2Manager, Messages):
 
     def disable(self, site = ''): #Disable site
 
-
         site = site[:-5] or ''
 
         if site != '':
