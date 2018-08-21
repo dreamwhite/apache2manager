@@ -60,19 +60,6 @@ class Apache2Manager():
 
         return commands
 
-    def php_versions(self): #Get all PHP versions installed
-
-        php_versions = []
-
-        for file in os.listdir("/etc/init.d"):
-
-            if file.endswith("-fpm"):
-
-                php_versions.append(file)
-    
-        php_versions = sorted(php_versions)
-
-        return php_versions
 
 class Messages(): #Custom messages
 
@@ -204,12 +191,18 @@ class Get():
 
         return sorted_enabled_sites_list
 
+    # print("The current enabled sites are: \n{0}{1}".format(
+    #     enabled_sites, ENDC))
+
     def available_sites(self): #Get available sites
 
 
         available_sites_list = os.listdir(self.manager.available_sites_path)
         sorted_available_sites_list = sorted(available_sites_list)
         available_sites = self.helper.grid(sorted_available_sites_list)
+
+        # print("The current enabled sites are: \n{0}{1}".format(
+        #     available_sites, ENDC))
 
         self.messages.clear_console()
 
@@ -251,6 +244,20 @@ class Get():
         self.messages.clear_console()
 
         print(self.helper.grid(sites_grid))
+
+    def php_versions(self): #Get all PHP versions installed
+
+        php_versions = []
+
+        for file in os.listdir("/etc/init.d"):
+
+            if file.endswith("-fpm"):
+
+                php_versions.append(file)
+    
+        php_versions = sorted(php_versions)
+
+        return php_versions
 
 
 class Site():
@@ -446,7 +453,6 @@ class VHost():
 
                     self.messages.warning("Site {0} is currently enabled. Disabling it...".format(url))
                     self.site.disable(sites[site_to_destroy])
-                # if site is enabled, disable it else nothing
 
                 else:
 
