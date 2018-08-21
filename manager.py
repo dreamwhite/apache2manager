@@ -1,4 +1,4 @@
-#!/usr/bin/python3
+#!/usr/bin/python
 # -*- coding: utf-8 -*-
 
 # STRUCTURE: THE VHOST ENABLED ARE IN THE DIRECTORY /etc/apache2/sites-enabled and follows the format $sitename.conf
@@ -98,30 +98,30 @@ class Messages(): #Custom messages
 
         print("\033c") #Code for clearing the console and block the scroll up
 
-class Delete(Apache2Manager, Messages):
+class Delete():
 
     manager = Apache2Manager()
 
-    message = Messages()
+    messages = Messages()
 
     def var_www(self, url, delete_www_path): #Delete docroot
     
         subprocess.call("rm -r {0}".format(delete_www_path), shell=True)
 
-        self.message.correct("Successfully removed the www of {0}!".format(url))
+        self.messages.correct("Successfully removed the www of {0}!".format(url))
 
     def from_etc_hosts(self, url): #Delete from hosts file
 
         rmlinematch('127.0.0.1       {0}'.format(url), self.manager.hosts_file)
-        self.message.warning("Site {0} deleted successfully from /etc/hosts file".format(url))
+        self.messages.warning("Site {0} deleted successfully from /etc/hosts file".format(url))
 
     def vhost_conf(self, url, vhost): #Delete vhost configuration file
     
         os.remove(self.manager.available_sites_path + "/" + vhost)
 
-        self.message.correct("VHost configuration file for {0} successfully deleted!".format(url))
+        self.messages.correct("VHost configuration file for {0} successfully deleted!".format(url))
 
-class Helper(Apache2Manager, Messages):
+class Helper():
     
     def grid(self, array): #Create grid
 
@@ -166,7 +166,7 @@ class Helper(Apache2Manager, Messages):
 
 
 
-class Get(Apache2Manager, Messages):
+class Get():
 
     manager = Apache2Manager()
 
@@ -190,7 +190,7 @@ class Get(Apache2Manager, Messages):
 
             disabled_sites.append(disabled_site)
 
-        self.helper.clear_console()
+        self.messages.clear_console()
 
         return sites
 
@@ -200,7 +200,7 @@ class Get(Apache2Manager, Messages):
         sorted_enabled_sites_list = sorted(enabled_sites_list)
         enabled_sites = self.helper.grid(sorted_enabled_sites_list)
 
-        self.helper.clear_console()
+        self.messages.clear_console()
 
         return sorted_enabled_sites_list
 
@@ -217,7 +217,7 @@ class Get(Apache2Manager, Messages):
         # print("The current enabled sites are: \n{0}{1}".format(
         #     available_sites, ENDC))
 
-        self.helper.clear_console()
+        self.messages.clear_console()
 
         return sorted_available_sites_list
 
@@ -254,12 +254,12 @@ class Get(Apache2Manager, Messages):
 
         print("\n")
 
-        self.helper.clear_console()
+        self.messages.clear_console()
 
         print(self.helper.grid(sites_grid))
 
 
-class Site(Apache2Manager, Messages):
+class Site():
 
     manager = Apache2Manager()
     messages = Messages()
@@ -342,9 +342,7 @@ class Site(Apache2Manager, Messages):
                 subprocess.call(reload_command, shell=True)
                 self.messages.correct("Service Apache2 successfully reloaded!")
 
-
-
-class VHost(Apache2Manager, Messages):
+class VHost():
 
     manager = Apache2Manager()
     messages = Messages()
@@ -494,11 +492,11 @@ class VHost(Apache2Manager, Messages):
 
                 self.messages.correct("Site {0} successfully destroyed, good job bro'".format(url))
 
-                self.helper.clear_console()
+                self.messages.clear_console()
 
                 Cli().main_menu()
             
-class Cli(Apache2Manager, Messages):
+class Cli():
 
     manager = Apache2Manager()
     commands = manager.commands()
