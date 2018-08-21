@@ -186,13 +186,9 @@ class Get():
         enabled_sites_list = os.listdir(self.manager.enabled_sites_path)
         sorted_enabled_sites_list = sorted(enabled_sites_list)
         enabled_sites = self.helper.grid(sorted_enabled_sites_list)
-
         self.messages.clear_console()
 
         return sorted_enabled_sites_list
-
-    # print("The current enabled sites are: \n{0}{1}".format(
-    #     enabled_sites, ENDC))
 
     def available_sites(self): #Get available sites
 
@@ -200,10 +196,6 @@ class Get():
         available_sites_list = os.listdir(self.manager.available_sites_path)
         sorted_available_sites_list = sorted(available_sites_list)
         available_sites = self.helper.grid(sorted_available_sites_list)
-
-        # print("The current enabled sites are: \n{0}{1}".format(
-        #     available_sites, ENDC))
-
         self.messages.clear_console()
 
         return sorted_available_sites_list
