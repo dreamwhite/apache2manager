@@ -1,4 +1,4 @@
-#!/usr/bin/python
+#!/usr/bin/python3
 # -*- coding: utf-8 -*-
 
 # STRUCTURE: THE VHOST ENABLED ARE IN THE DIRECTORY /etc/apache2/sites-enabled and follows the format $sitename.conf
@@ -19,6 +19,8 @@ class Apache2Manager():
 
     sites = []
     php_version = []
+
+    FNULL = open(os.devnull, 'w')
     
     def __init__(self):
 
@@ -48,6 +50,7 @@ class Apache2Manager():
             "destroy",
             "disable",
             "enable",
+            "edit",
             "exit",
             "help",
             "list",
@@ -93,19 +96,18 @@ class Delete():
 
     def var_www(self, url, delete_www_path): #Delete docroot
     
-        subprocess.call("rm -r {0}".format(delete_www_path), shell=True)
+        subprocess.call("rm -r {0}".format(delete_www_path), shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
 
         self.messages.correct("Successfully removed the www of {0}!".format(url))
 
     def from_etc_hosts(self, url): #Delete from hosts file
 
         rmlinematch('127.0.0.1       {0}'.format(url), self.manager.hosts_file)
-        self.messages.warning("Site {0} deleted successfully from /etc/hosts file".format(url))
+        self.messages.correct("Site {0} deleted successfully from /etc/hosts file".format(url))
 
     def vhost_conf(self, url, vhost): #Delete vhost configuration file
-    
-        os.remove(self.manager.available_sites_path + "/" + vhost)
 
+        subprocess.call("sudo rm {0}".format(vhost), shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
         self.messages.correct("VHost configuration file for {0} successfully deleted!".format(url))
 
 class Helper():
@@ -149,9 +151,7 @@ class Helper():
 
             grid_commands.append(command)
 
-        print(grid(grid_commands))        
-
-
+        print(grid(grid_commands))
 
 class Get():
 
@@ -231,8 +231,6 @@ class Get():
 
                 sites_grid.append(site)
 
-        print("\n")
-
         self.messages.clear_console()
 
         print(self.helper.grid(sites_grid))
@@ -268,8 +266,8 @@ class Site():
 
             enable_command = "sudo a2ensite {0}".format(site)
             reload_command = "sudo systemctl reload apache2"
-            subprocess.call(enable_command, shell=True)
-            subprocess.call(reload_command, shell=True)
+            subprocess.call(enable_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
+            subprocess.call(reload_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
 
         else:
 
@@ -290,9 +288,9 @@ class Site():
 
             else:
 
-                subprocess.call(enable_command, shell=True)
+                subprocess.call(enable_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
                 self.messages.correct("Site {2}{0}{1}{2}{3} successfully enabled!".format(CYAN, available_sites[site_to_enable], ENDC, OKGREEN))
-                subprocess.call(reload_command, shell=True)
+                subprocess.call(reload_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
                 self.messages.correct("Service Apache2 successfully reloaded!")
 
 
@@ -304,8 +302,8 @@ class Site():
 
             disable_command = "sudo a2dissite {0}".format(site)
             reload_command = "sudo systemctl reload apache2"
-            subprocess.call(disable_command, shell=True)
-            subprocess.call(reload_command, shell=True)
+            subprocess.call(disable_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
+            subprocess.call(reload_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
 
         else:
     
@@ -314,38 +312,120 @@ class Site():
             available_sites = self.get.available_sites()
             self.get.all_sites()
 
+            try:
+                site_to_disable = int(input("Site to disable: "))
 
-            site_to_disable = int(input("Site to disable: "))
+                enable_command = "sudo a2dissite {0}".format(available_sites[site_to_disable])
+                reload_command = "sudo systemctl reload apache2"
 
-            enable_command = "sudo a2dissite {0}".format(available_sites[site_to_disable])
+                if available_sites[site_to_disable] not in enabled_sites:
 
-            reload_command = "sudo systemctl reload apache2"
+                    self.messages.error("Site {2}{0}{1}{2}{3} already disabled!".format(CYAN, available_sites[site_to_disable], ENDC, FAIL))
 
+                else:
 
-            if available_sites[site_to_disable] not in enabled_sites:
+                    self.messages.clear_console()
+                    subprocess.call(enable_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
+                    self.messages.correct("Site {2}{0}{1}{2}{3} successfully disabled!".format(CYAN, available_sites[site_to_disable], ENDC, FAIL))
+                    subprocess.call(reload_command, shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
+                    self.messages.correct("Service Apache2 successfully reloaded!")
 
-                self.messages.error("Site {2}{0}{1}{2}{3} already disabled!".format(CYAN, available_sites[site_to_disable], ENDC, FAIL))
-
-            else:
+            except (KeyboardInterrupt, EOFError) as e:
 
                 self.messages.clear_console()
-                subprocess.call(enable_command, shell=True)
-                self.messages.correct("Site {2}{0}{1}{2}{3} successfully disabled!".format(CYAN, available_sites[site_to_disable], ENDC, FAIL))
-                subprocess.call(reload_command, shell=True)
-                self.messages.correct("Service Apache2 successfully reloaded!")
+                Cli().main_menu()
 
-class VHost():
+class Change():
 
     manager = Apache2Manager()
+    commands = manager.commands()
     messages = Messages()
     helper = Helper()
     get = Get()
     site = Site()
     remove = Delete()
 
-    def create(self): #Create vhost
+    regex_url = "(?<=ServerName ).*(?=)"
+    regex_docroot = "(?<=DocumentRoot ).*?(?=)"
+    regex_directory = "(?<=<Directory ).*?(?=\/>)"
+    regex_php = """(?<=SetHandler "proxy:unix:\/var\/run\/php\/).*(?=.sock\|fcgi:\/\/localhost\/)"""
 
-        name = input("Site name: ").lower()
+    def url(self, newurl, vhost):
+
+        vhost = self.manager.available_sites_path + '/' + vhost or ''
+
+        with open(vhost, 'r') as vhost_conf:
+
+            new_vconf = vhost_conf.read()
+            old_url = re.search(self.regex_url, new_vconf).group(0)
+            print(old_url)
+
+        with open(vhost, 'w') as vhost_conf:
+
+            new_vconf = re.sub(self.regex_url, newurl, new_vconf)
+            vhost_conf.write(new_vconf)
+
+        self.remove.from_etc_hosts(old_url)
+
+        with open(self.manager.hosts_file, 'a') as hosts:
+
+            hosts.write("127.0.0.1       {0}".format(newurl))
+        
+        self.messages.correct("Successfully replaced {3}{0}{4} URL from {3}{1}{4} with {3}{2}{4}!".format(vhost, old_url, newurl, CYAN, ENDC))
+
+    def docroot(self, newdocroot, vhost):
+
+        newdocroot = '/var/www/{0}'.format(newdocroot)
+
+        old_docroot = re.search(self.regex_docroot, vhost).group(0)
+
+        new_docroot = re.sub(self.regex_docroot, newdocroot, vhost)
+
+        subprocess.call("mv {0}".format(newdocroot), shell=True, stdout=self.manager.FNULL, stderr=subprocess.STDOUT)
+
+        self.messages.correct("Successfully replaced {2}{0}{3} docroot with {2}{1}{3}!".format(vhost, newdocroot, CYAN, ENDC))
+
+    def php(self, new_php_version, vhost):
+
+        vhost = self.manager.available_sites_path + '/' + vhost
+
+        with open(vhost, 'r') as vhost_conf:
+
+            new_vconf = vhost_conf.read()
+            old_php_version = re.search(self.regex_php, new_vconf).group(0)
+
+        with open(vhost, 'w') as vhost_conf:
+
+            new_vconf = re.sub(self.regex_php, new_php_version, new_vconf)
+        
+            vhost_conf.write(new_vconf)
+
+        self.messages.correct("Successfully replaced {3}{0}{4} PHP version from {3}{1}{4} to {3}{2}{4}!".format(vhost, old_php_version, new_php_version, CYAN, ENDC))
+
+
+class VHost():
+
+    manager = Apache2Manager()
+    messages = Messages()
+    commands = manager.commands()
+    helper = Helper()
+    get = Get()
+    site = Site()
+    remove = Delete()
+    change = Change()
+
+    def create(self): #Create vhost
+        
+
+        try:
+            
+            name = input("Site name: ").lower()
+
+        except (KeyboardInterrupt, EOFError) as e:
+
+            self.messages.clear_console()
+            Cli().main_menu()
+
         url = name + self.manager.domain 
         docroot = "/var/www/{0}".format(name)
         conf_file = "/etc/apache2/sites-available/{0}.conf".format(name)
@@ -358,7 +438,14 @@ class VHost():
 
             print(OKBLUE + str(x) + ") " + ENDC + CYAN + php_version[x] + ENDC)
 
-        php_version_input = int(input("\nPHP Version: "))
+        try:
+            
+            php_version_input = int(input("\nPHP Version: "))
+
+        except (KeyboardInterrupt, EOFError) as e:
+
+            self.messages.clear_console()
+            Cli().main_menu()
 
         php_fpm = php_version[php_version_input]
 
@@ -395,7 +482,14 @@ class VHost():
                     phpinfo.close()
 
 
-        enable_prompt = input("Do you want to enable {2}{0}{1}? [Y,n]: ".format(url, ENDC, CYAN)).lower()
+        try:
+            
+            enable_prompt = input("Do you want to enable {2}{0}{1}? [Y,n]: ".format(url, ENDC, CYAN)).lower()
+
+        except (KeyboardInterrupt, EOFError) as e:
+
+            self.messages.clear_console()
+            Cli().main_menu
 
         if enable_prompt in ['', 'y']:
 
@@ -409,15 +503,20 @@ class VHost():
 
     def delete(self): #Delete vhost
 
-    
         self.messages.warning("WARNING! IF YOU DELETE A VHOST YOU WILL LOST ANY DATA RELATED WITH IT.")
 
         user_input = ''
 
         while user_input == '':
 
-            user_confirmation = input("ARE YOU SURE YOU WANT TO PROCEED? [y,N]: ").lower()
+            try:
+                
+                user_confirmation = input("ARE YOU SURE YOU WANT TO PROCEED? [y,N]: ").lower()
 
+            except (KeyboardInterrupt, EOFError) as e:
+
+                self.messages.clear_console()
+                Cli().main_menu
 
             if user_confirmation not in ["y", "N", '']:
 
@@ -433,7 +532,16 @@ class VHost():
 
                 self.get.all_sites()
 
-                site_to_destroy = int(input("Which vhost do you want to delete?: "))
+                try:
+                    
+                    site_to_destroy = int(input("Which vhost do you want to delete?: "))
+
+                except (KeyboardInterrupt, EOFError) as e:
+
+                    self.messages.clear_console()
+                    Cli().main_menu
+
+                vhost_conf = self.manager.available_sites_path + '/' + sites[site_to_destroy]
 
                 domain_subfix = sites[site_to_destroy][:-5]
 
@@ -450,43 +558,271 @@ class VHost():
 
                     self.messages.correct("Site {0} is already disabled. Nothing to do here...".format(url))
 
-                remove_from_etc_hosts_prompt = input("Remove {0} from the /etc/hosts file? [Y,n]: ".format(url)).lower()
+                etc_hosts_input = ''
 
-                if remove_from_etc_hosts_prompt not in ["y", "n"]:
+                while etc_hosts_input == '':
 
-                    self.messages.error("Answer not valid. Please retry!")
+                    try:
+                        
+                        remove_from_etc_hosts_prompt = input("Remove {0} from the /etc/hosts file? [Y,n]: ".format(url)).lower()
 
-                if user_confirmation in ['', 'y']:
+                    except (KeyboardInterrupt, EOFError) as e:
 
-                    self.remove.from_etc_hosts(url)
+                        self.messages.clear_console()
+                        Cli().main_menu
 
-                remove_www = input("Remove the content of {0} from /var/www? [y,N]: ".format(url)).lower()
+                    if remove_from_etc_hosts_prompt not in ["y", "n"]:
 
-                if remove_www not in ["y", "n"]:
+                        self.messages.error("Answer not valid. Please retry!")
+                        etc_hosts_input = ''
 
-                    self.messages.error("\nAnswer not valid. Please retry!")
+                    if user_confirmation in ['', 'y']:
 
-                if remove_www in ['y']:
+                        self.remove.from_etc_hosts(url)
+                        etc_hosts_input = '_'
 
-                    self.remove.var_www(url, delete_www_path)
+                www_input = ''
 
+                while www_input == '':
 
-                remove_vhost_conf = input("Remove the vhost configuration file for {0}? [y,N]: ".format(url)).lower()
+                    try:
+                        
+                        remove_www = input("Remove the content of {0} from /var/www? [y,N]: ".format(url)).lower()
 
-                if remove_vhost_conf not in ["y", "n"]:
+                    except (KeyboardInterrupt, EOFError) as e:
 
-                    self.messages.error("\nAnswer not valid. Please retry!")
+                        self.messages.clear_console()
+                        Cli().main_menu
 
-                if remove_vhost_conf in ['y']:
+                    if remove_www not in ["y", "n"]:
 
-                    self.remove.vhost_conf(url, sites[site_to_destroy])
+                        self.messages.error("\nAnswer not valid. Please retry!")
 
-                self.messages.correct("Site {0} successfully destroyed, good job bro'".format(url))
+                    if remove_www in ['y']:
 
-                self.messages.clear_console()
+                        self.remove.var_www(url, delete_www_path)
+                        www_input = '_'
+
+                vhost_input = ''
+
+                while vhost_input == '':
+
+                    try:
+                        
+                        remove_vhost_conf = input("Remove the vhost configuration file for {0}? [y,N]: ".format(url)).lower()
+
+                    except (KeyboardInterrupt, EOFError) as e:
+
+                        self.messages.clear_console()
+                        Cli().main_menu
+
+                    if remove_vhost_conf not in ["y", "n"]:
+
+                        self.messages.error("\nAnswer not valid. Please retry!")
+
+                    if remove_vhost_conf in ['y']:
+
+                        self.remove.vhost_conf(url, vhost_conf)
+                        self.messages.correct("Site {0} successfully destroyed, good job bro'".format(url))
+                        self.messages.clear_console()
+                        vhost_input = '_'
 
                 Cli().main_menu()
             
+    def edit(self, vhost = ''):
+
+        vhost = vhost or ''
+
+        self.messages.warning("Be careful editing those parameters, they can break your vhost!")
+
+        user_input = ''
+
+        while user_input == '':
+
+            try:
+                
+                user_confirmation = input("ARE YOU SURE YOU WANT TO PROCEED? [y,N]: ").lower()
+
+            except (KeyboardInterrupt, EOFError) as e:
+
+                self.messages.clear_console()
+                Cli().main_menu
+
+            if user_confirmation not in ["y", "n", '']:
+
+                self.messages.error("Answer not valid. Please retry!")
+
+                user_input = ''
+
+            if user_confirmation in ['', 'n']:
+
+                self.messages.warning("Action cancelled")
+
+                Cli().main_menu()
+
+            if user_confirmation in ["y"]:
+
+                disabled_sites = self.get.disabled_sites()
+                enabled_sites = self.get.enabled_sites()
+                available_sites = self.get.available_sites()
+
+                self.get.all_sites()
+
+                try:
+                    
+                    site_to_edit = int(input("Which vhost do you want to edit?: "))
+
+                except (KeyboardInterrupt, EOFError) as e:
+
+                    self.messages.clear_console()
+                    Cli().main_menu()
+
+                vhost = sites[site_to_edit]
+
+                if available_sites[site_to_edit] not in enabled_sites:
+
+                    self.messages.error("Site {2}{0}{1}{2}{3} already disabled!".format(CYAN, sites[site_to_edit], ENDC, FAIL))
+
+                else:
+
+                    self.site.disable(sites[site_to_edit])
+
+                vhost_conf_file = self.manager.available_sites_path + '/' + vhost
+                
+
+                with open(vhost_conf_file, 'r') as f:
+
+                    vhost_conf = f.read()
+
+                domain_subfix = sites[site_to_edit][:-5]
+
+                url = domain_subfix + self.manager.domain
+        
+                url_input = ''
+
+                while url_input == '':
+
+                    try:
+                        
+                        edit_url_prompt = input("Change {1}{0}{2} URl? [y,N]: ".format(url, CYAN, ENDC)).lower()
+
+                    except (KeyboardInterrupt, EOFError) as e:
+
+                        self.messages.clear_console()
+                        Cli().main_menu
+
+                    if edit_url_prompt not in ["y", "n", ""]:
+
+                        self.messages.error("Answer not valid. Please retry!")
+                        url_input = ''
+
+                    if edit_url_prompt in ["y"]:
+
+                        try:
+                            
+                            new_url = input("New URL: ").lower()
+
+                        except (KeyboardInterrupt, EOFError) as e:
+
+                            self.messages.clear_console()
+                            Cli().main_menu
+
+                        self.change.url(new_url, sites[site_to_edit])
+
+                        self.site.enable(sites[site_to_edit])
+
+                        url_input = '_'
+                    
+                    else:
+
+                        url_input = '_'
+
+                docroot_input = ''
+
+                while docroot_input == '':
+
+                    try:
+                        
+                        edit_docroot_prompt = input("Change {0} docroot? [y,N]: ".format(url)).lower()
+
+                    except (KeyboardInterrupt, EOFError) as e:
+
+                        self.messages.clear_console()
+                        Cli().main_menu
+
+                    if edit_docroot_prompt not in ['', 'y', 'n']:
+
+                        self.messages.error("Answer not valid. Please retry!")
+                        docroot_input = ''                        
+
+                    if edit_docroot_prompt in ['y']:
+
+                        try:
+                            
+                            newdocroot = input("New docroot: [/var/www/]: ")
+
+                        except (KeyboardInterrupt, EOFError) as e:
+
+                            self.messages.clear_console()
+                            Cli().main_menu()
+
+                        new_docroot = '/var/www/{0}'.format(newdocroot)
+                        self.change.docroot(new_docroot, vhost_conf_file)
+                        docroot_input = '_'
+
+                    else:
+
+                        docroot_input = '_'
+
+                php_prompt = ''
+
+                while php_prompt == '':
+
+                    try:
+                        
+                        edit_php_prompt = input("Change {0} PHP version? [y,N]: ".format(url)).lower()
+
+                    except (KeyboardInterrupt, EOFError) as e:
+
+                        self.messages.clear_console()
+                        Cli().main_menu()
+
+                    if edit_php_prompt not in ['', 'y', 'n']:  # Check for command
+
+                        self.messages.error("Answer not valid. Please retry!")
+                        php_prompt = ''
+
+                    if edit_php_prompt in ['y']:
+
+                        php_version = self.get.php_versions()
+
+                        for x in range(len(php_version)):
+
+                            print(OKBLUE + str(x) + ") " + ENDC + CYAN + php_version[x] + ENDC)
+
+                        try:
+                            
+                            new_php_version = int(input("PHP Version: "))
+
+                        except (KeyboardInterrupt, EOFError) as e:
+
+                            self.messages.clear_console()
+                            Cli().main_menu()
+
+                        php_fpm = php_version[new_php_version]
+                        self.change.php(php_fpm, sites[site_to_edit])
+                        php_prompt = '_'
+
+                    else:
+
+                        php_prompt = '_'
+
+                self.site.disable(sites[site_to_edit])
+                self.site.enable(sites[site_to_edit])
+
+                Cli().main_menu()
+                
+
 class Cli():
 
     manager = Apache2Manager()
@@ -497,6 +833,7 @@ class Cli():
     site = Site()
     remove = Delete()
     vhost = VHost()
+    change = Change()
 
     def main_menu(self): #Main menu
 
@@ -504,40 +841,51 @@ class Cli():
 
         while shell_prompt == "":
 
-            command = input(">>> ").lower()  # Shell input
+            try:
+                
+                command = input(">>> ").lower()  # Shell input
 
-            if command not in self.commands:  # Check for command
+                if command not in self.commands:  # Check for command
 
-                self.messages.command_not_found(command)
+                    self.messages.command_not_found(command)
 
-            if command in ["quit", "exit", "close"]:
+                if command in ["quit", "exit", "close"]:
 
-                print("Bye Bye!")
-                exit()
+                    print("Bye Bye!")
+                    exit()
 
-            if command in ["list", "show", "enabled"]:
+                if command in ["list", "show", "enabled"]:
 
-                self.get.all_sites()
+                    self.get.all_sites()
 
-            if command in ["add", "create", "new"]:
+                if command in ["add", "create", "new"]:
 
-                self.vhost.create()
+                    self.vhost.create()
 
-            if command in ["disable"]:
+                if command in ["disable"]:
 
-                self.site.disable()
+                    self.site.disable()
 
-            if command in ["enable"]:
+                if command in ["enable"]:
 
-                self.site.enable()
+                    self.site.enable()
 
-            if command in ["remove", "delete", "destroy"]:
+                if command in ["remove", "delete", "destroy"]:
 
-                self.vhost.delete()
+                    self.vhost.delete()
 
-            if command in ["?", "help"]:
+                if command in ["edit"]:
 
-                self.helper.help()
+                    self.vhost.edit()
+
+                if command in ["?", "help"]:
+
+                    self.helper.help()
+
+            except (KeyboardInterrupt, EOFError) as e:
+
+                self.messages.clear_console()
+                Cli().main_menu()
 
 if __name__ == "__main__":
 
